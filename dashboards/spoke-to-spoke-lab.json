@@ -1,814 +1,466 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_AZURE_MONITOR",
-      "label": "Azure Monitor",
-      "description": "Azure Monitor data source",
-      "type": "datasource",
-      "pluginId": "grafana-azure-monitor-datasource",
-      "pluginName": "Azure Monitor"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "10.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "grafana-azure-monitor-datasource",
-      "name": "Azure Monitor",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
-    }
-  ],
-  "annotations": {
-    "list": []
-  },
-  "description": "Spoke-to-Spoke Lab: VPN Gateway hairpin traffic monitoring with VM and Storage Account correlation metrics",
+  "uid": "spoke-to-spoke-lab",
+  "title": "Spoke-to-Spoke Lab - VPN Gateway Hairpin",
+  "description": "Spoke-to-Spoke Lab: VPN Gateway hairpin traffic monitoring",
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
-  "links": [],
+  "tags": [
+    "azure",
+    "vpn-gateway",
+    "spoke-to-spoke"
+  ],
   "panels": [
     {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "type": "row",
       "id": 100,
       "title": "VPN Gateway Metrics",
-      "type": "row"
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
-      "title": "Gateway S2S Bandwidth (Bytes/sec)",
-      "description": "Site-to-site bandwidth through the VPN gateway. Spikes here when azcopy runs confirm traffic is hairpinning through the gateway.",
-      "type": "timeseries",
-      "id": 1,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "auto",
-            "pointSize": 5,
-            "axisLabel": "Bytes/sec"
-          },
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
-            "metricName": "AverageBandwidth",
-            "aggregation": "Average",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "Gateway Inbound / Outbound Flows",
-      "description": "5-tuple flow count entering and exiting the VPN gateway. High flow counts indicate the gateway is handling spoke-to-spoke traffic.",
       "type": "timeseries",
       "id": 2,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
-      "datasource": "${DS_AZURE_MONITOR}",
+      "title": "Gateway Inbound / Outbound Flows",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
+            "fillOpacity": 0,
+            "gradientMode": "none",
             "showPoints": "auto",
-            "pointSize": 5,
-            "axisLabel": "Flows"
+            "pointSize": 5
           },
           "unit": "short"
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
           "refId": "A",
           "queryType": "Azure Monitor",
           "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Network/virtualNetworkGateways/vpn-gw-hub",
+                "metricNamespace": "Microsoft.Network/virtualNetworkGateways"
+              }
+            ],
             "metricName": "InboundFlowsCount",
             "aggregation": "Maximum",
             "timeGrain": "PT5M",
-            "dimensionFilters": []
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Network/virtualNetworkGateways",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "vpn-gw-hub",
+            "metricDefinition": "Microsoft.Network/virtualNetworkGateways",
+            "region": "centralus"
           },
-          "subscription": "$subscription"
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
         },
         {
           "refId": "B",
           "queryType": "Azure Monitor",
           "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Network/virtualNetworkGateways/vpn-gw-hub",
+                "metricNamespace": "Microsoft.Network/virtualNetworkGateways"
+              }
+            ],
             "metricName": "OutboundFlowsCount",
             "aggregation": "Maximum",
             "timeGrain": "PT5M",
-            "dimensionFilters": []
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Network/virtualNetworkGateways",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "vpn-gw-hub",
+            "metricDefinition": "Microsoft.Network/virtualNetworkGateways",
+            "region": "centralus"
           },
-          "subscription": "$subscription"
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
         }
       ]
     },
     {
-      "title": "Tunnel Ingress Bytes",
-      "description": "Total incoming bytes through the VPN tunnel. Compare against storage account egress to see correlation.",
       "type": "timeseries",
-      "id": 3,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
-      "datasource": "${DS_AZURE_MONITOR}",
+      "id": 1,
+      "title": "Gateway S2S Bandwidth (Bytes/sec)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "#4a9eed", "mode": "fixed" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
-            "metricName": "TunnelIngressBytes",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "Tunnel Egress Bytes",
-      "description": "Total outgoing bytes through the VPN tunnel.",
-      "type": "timeseries",
-      "id": 4,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#8b5cf6", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
-            "metricName": "TunnelEgressBytes",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "Tunnel Peak PPS",
-      "description": "Peak packets per second through the tunnel. This is the metric most likely to hit limits first with small-packet workloads.",
-      "type": "timeseries",
-      "id": 5,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#ef4444", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "PPS"
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
-            "metricName": "TunnelPeakPackets",
-            "aggregation": "Maximum",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
-      "id": 101,
-      "title": "VM Metrics (vm-dbrx)",
-      "type": "row"
-    },
-    {
-      "title": "VM Network Out (Bytes)",
-      "description": "Total bytes sent from vm-dbrx. Should correlate with gateway bandwidth when traffic is hairpinning.",
-      "type": "timeseries",
-      "id": 6,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#22c55e", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vmDbrx",
-            "metricDefinition": "microsoft.compute/virtualmachines",
-            "metricNamespace": "microsoft.compute/virtualmachines",
-            "metricName": "Network Out Total",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "VM Network In (Bytes)",
-      "description": "Total bytes received by vm-dbrx. The download leg of azcopy cycles.",
-      "type": "timeseries",
-      "id": 7,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#06b6d4", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vmDbrx",
-            "metricDefinition": "microsoft.compute/virtualmachines",
-            "metricNamespace": "microsoft.compute/virtualmachines",
-            "metricName": "Network In Total",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
-      "id": 102,
-      "title": "Storage Account Metrics (ADLS Gen2)",
-      "type": "row"
-    },
-    {
-      "title": "Storage Ingress (Bytes)",
-      "description": "Bytes written to the ADLS Gen2 storage account. Should match VM Network Out during azcopy uploads.",
-      "type": "timeseries",
-      "id": 8,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#f59e0b", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$storageAccount",
-            "metricDefinition": "microsoft.storage/storageaccounts",
-            "metricNamespace": "microsoft.storage/storageaccounts",
-            "metricName": "Ingress",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "Storage Egress (Bytes)",
-      "description": "Bytes read from the ADLS Gen2 storage account. Should match VM Network In during azcopy downloads.",
-      "type": "timeseries",
-      "id": 9,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#84cc16", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Bytes"
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$storageAccount",
-            "metricDefinition": "microsoft.storage/storageaccounts",
-            "metricNamespace": "microsoft.storage/storageaccounts",
-            "metricName": "Egress",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "title": "Storage Transactions",
-      "description": "Total transaction count on the storage account. Gives a sense of request volume independent of payload size.",
-      "type": "timeseries",
-      "id": 10,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "fixedColor": "#ec4899", "mode": "fixed" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "showPoints": "never",
-            "axisLabel": "Count"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$storageAccount",
-            "metricDefinition": "microsoft.storage/storageaccounts",
-            "metricNamespace": "microsoft.storage/storageaccounts",
-            "metricName": "Transactions",
-            "aggregation": "Total",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
-      "id": 103,
-      "title": "Summary Stats",
-      "type": "row"
-    },
-    {
-      "title": "GW Bandwidth (avg)",
-      "type": "stat",
-      "id": 11,
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 36 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "#22c55e", "value": null },
-              { "color": "#f59e0b", "value": 50000000 },
-              { "color": "#ef4444", "value": 100000000 }
-            ]
+            "fillOpacity": 15
           },
           "unit": "Bps"
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
           "refId": "A",
           "queryType": "Azure Monitor",
           "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Network/virtualNetworkGateways/vpn-gw-hub",
+                "metricNamespace": "Microsoft.Network/virtualNetworkGateways"
+              }
+            ],
             "metricName": "AverageBandwidth",
             "aggregation": "Average",
             "timeGrain": "PT5M",
-            "dimensionFilters": []
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Network/virtualNetworkGateways",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "vpn-gw-hub",
+            "metricDefinition": "Microsoft.Network/virtualNetworkGateways",
+            "region": "centralus"
           },
-          "subscription": "$subscription"
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
         }
       ]
     },
     {
-      "title": "Peak PPS (max)",
-      "type": "stat",
-      "id": 12,
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 36 },
-      "datasource": "${DS_AZURE_MONITOR}",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "#22c55e", "value": null },
-              { "color": "#f59e0b", "value": 50000 },
-              { "color": "#ef4444", "value": 100000 }
-            ]
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["max"], "fields": "", "values": false },
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vpnGateway",
-            "metricDefinition": "microsoft.network/virtualnetworkgateways",
-            "metricNamespace": "microsoft.network/virtualnetworkgateways",
-            "metricName": "TunnelPeakPackets",
-            "aggregation": "Maximum",
-            "timeGrain": "PT5M",
-            "dimensionFilters": []
-          },
-          "subscription": "$subscription"
-        }
-      ]
+      "type": "row",
+      "id": 200,
+      "title": "VM Metrics (vm-dbrx)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      }
     },
     {
-      "title": "VM Net Out (total)",
-      "type": "stat",
-      "id": 13,
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 36 },
-      "datasource": "${DS_AZURE_MONITOR}",
+      "type": "timeseries",
+      "id": 5,
+      "title": "VM Network Out (Bytes)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "#22c55e", "value": null },
-              { "color": "#f59e0b", "value": 1000000000 },
-              { "color": "#ef4444", "value": 10000000000 }
-            ]
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
           },
           "unit": "decbytes"
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
           "refId": "A",
           "queryType": "Azure Monitor",
           "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$vmDbrx",
-            "metricDefinition": "microsoft.compute/virtualmachines",
-            "metricNamespace": "microsoft.compute/virtualmachines",
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Compute/virtualMachines/vm-dbrx",
+                "metricNamespace": "Microsoft.Compute/virtualMachines"
+              }
+            ],
             "metricName": "Network Out Total",
             "aggregation": "Total",
             "timeGrain": "PT5M",
-            "dimensionFilters": []
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Compute/virtualMachines",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "vm-dbrx",
+            "metricDefinition": "Microsoft.Compute/virtualMachines",
+            "region": "centralus"
           },
-          "subscription": "$subscription"
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
         }
       ]
     },
     {
-      "title": "Storage Txns (total)",
-      "type": "stat",
-      "id": 14,
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 36 },
-      "datasource": "${DS_AZURE_MONITOR}",
+      "type": "timeseries",
+      "id": 6,
+      "title": "VM Network In (Bytes)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "#22c55e", "value": null },
-              { "color": "#f59e0b", "value": 1000 },
-              { "color": "#ef4444", "value": 10000 }
-            ]
+          "color": {
+            "mode": "palette-classic"
           },
-          "unit": "short"
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          },
+          "unit": "decbytes"
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
           "refId": "A",
           "queryType": "Azure Monitor",
           "azureMonitor": {
-            "resourceGroup": "$resourceGroup",
-            "resourceName": "$storageAccount",
-            "metricDefinition": "microsoft.storage/storageaccounts",
-            "metricNamespace": "microsoft.storage/storageaccounts",
-            "metricName": "Transactions",
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Compute/virtualMachines/vm-dbrx",
+                "metricNamespace": "Microsoft.Compute/virtualMachines"
+              }
+            ],
+            "metricName": "Network In Total",
             "aggregation": "Total",
             "timeGrain": "PT5M",
-            "dimensionFilters": []
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Compute/virtualMachines",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "vm-dbrx",
+            "metricDefinition": "Microsoft.Compute/virtualMachines",
+            "region": "centralus"
           },
-          "subscription": "$subscription"
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 300,
+      "title": "Storage Account Metrics (ADLS Gen2)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 7,
+      "title": "Storage Ingress (Bytes)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Monitor",
+          "azureMonitor": {
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01",
+                "metricNamespace": "Microsoft.Storage/storageAccounts"
+              }
+            ],
+            "metricName": "Ingress",
+            "aggregation": "Total",
+            "timeGrain": "PT1H",
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "saadlslabmh01",
+            "metricDefinition": "Microsoft.Storage/storageAccounts",
+            "region": "centralus"
+          },
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 8,
+      "title": "Storage Egress (Bytes)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "Azure Monitor",
+          "azureMonitor": {
+            "resources": [
+              {
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01",
+                "metricNamespace": "Microsoft.Storage/storageAccounts"
+              }
+            ],
+            "metricName": "Egress",
+            "aggregation": "Total",
+            "timeGrain": "PT1H",
+            "dimensionFilters": [],
+            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "resourceGroup": "rg-spoke-to-spoke-lab",
+            "resourceName": "saadlslabmh01",
+            "metricDefinition": "Microsoft.Storage/storageAccounts",
+            "region": "centralus"
+          },
+          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          }
         }
       ]
     }
-  ],
-  "refresh": "30s",
-  "schemaVersion": 38,
-  "tags": ["azure", "vpn-gateway", "spoke-to-spoke", "lab"],
-  "templating": {
-    "list": [
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Subscription",
-        "multi": false,
-        "name": "subscription",
-        "options": [],
-        "query": {
-          "queryType": "Azure Subscriptions"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Resource Group",
-        "multi": false,
-        "name": "resourceGroup",
-        "options": [],
-        "query": {
-          "queryType": "Azure Resource Groups",
-          "subscription": "$subscription"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "VPN Gateway",
-        "multi": false,
-        "name": "vpnGateway",
-        "options": [],
-        "query": {
-          "queryType": "Azure Resource Names",
-          "subscription": "$subscription",
-          "resourceGroup": "$resourceGroup",
-          "metricDefinition": "microsoft.network/virtualnetworkgateways"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "VM (dbrx)",
-        "multi": false,
-        "name": "vmDbrx",
-        "options": [],
-        "query": {
-          "queryType": "Azure Resource Names",
-          "subscription": "$subscription",
-          "resourceGroup": "$resourceGroup",
-          "metricDefinition": "microsoft.compute/virtualmachines"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Storage Account",
-        "multi": false,
-        "name": "storageAccount",
-        "options": [],
-        "query": {
-          "queryType": "Azure Resource Names",
-          "subscription": "$subscription",
-          "resourceGroup": "$resourceGroup",
-          "metricDefinition": "microsoft.storage/storageaccounts"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "query"
-      }
-    ]
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "browser",
-  "title": "Spoke-to-Spoke Lab - VPN Gateway Hairpin",
-  "uid": "spoke-to-spoke-lab",
-  "version": 1
+  ]
 }
