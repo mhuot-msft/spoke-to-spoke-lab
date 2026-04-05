@@ -1,13 +1,18 @@
-version: "1.0"
-project:
-  name: spoke-to-spoke-lab
-  description: Azure hub-and-spoke lab to simulate and measure spoke-to-spoke traffic hairpinning through a VPN gateway
-  tech_stack:
-    - Azure Bicep
-    - Azure CLI
-    - Grafana
-    - azcopy
-  conventions:
-    naming: "Resource names follow pattern: {type}-{purpose}-{env}"
-    modules: "One Bicep module per logical resource group (networking, compute, storage)"
-    parameters: "All configurable values exposed as parameters with sensible defaults"
+name: spoke-to-spoke-lab
+description: Azure hub-and-spoke lab to demonstrate VPN gateway hairpin traffic and validate remediation approaches
+tech_stack:
+  - Bicep (Azure IaC)
+  - Azure VPN Gateway (VpnGw1)
+  - Azure VNet Peering with Gateway Transit
+  - ADLS Gen2 (Storage Account with HNS)
+  - Private Endpoints (DFS)
+  - Private DNS Zones
+  - Ubuntu 22.04 LTS VM
+  - azcopy (traffic generation)
+  - Grafana with Azure Monitor data source
+conventions:
+  - All resources in a single resource group (rg-spoke-to-spoke-lab)
+  - Naming convention uses resource type prefix and functional suffix (e.g. vnet-hub, vm-dbrx, sa-adlslab)
+  - Bicep modules organized by domain (networking, compute, storage, monitoring)
+  - No hardcoded subscription or location values, use parameters
+  - All secrets and SAS tokens passed as secure parameters
