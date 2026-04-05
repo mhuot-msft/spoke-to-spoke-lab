@@ -10,16 +10,16 @@ Reproduces a real-world scenario where Databricks-to-ADLS traffic in a hub-and-s
 
 ```mermaid
 graph TD
-    subgraph hub["Hub VNet (10.0.0.0/16)"]
+    subgraph hub["Hub VNet (10.100.0.0/16)"]
         vpngw["VPN Gateway\nVpnGw1"]
     end
 
-    subgraph spoke1["Spoke 1 — vnet-spoke-dbrx (10.1.0.0/16)"]
+    subgraph spoke1["Spoke 1 — vnet-spoke-dbrx (10.101.0.0/16)"]
         vm["vm-dbrx\nLinux VM"]
         rt1["rt-dbrx\nUDR"]
     end
 
-    subgraph spoke2["Spoke 2 — vnet-spoke-adls (10.2.0.0/16)"]
+    subgraph spoke2["Spoke 2 — vnet-spoke-adls (10.102.0.0/16)"]
         adls["ADLS Gen2\nPrivate Endpoint"]
         rt2["rt-adls\nUDR"]
     end
@@ -34,8 +34,8 @@ graph TD
 > For the detailed diagram see [diagrams/spoke-to-spoke-lab.excalidraw](diagrams/spoke-to-spoke-lab.excalidraw).
 
 - **Hub VNet** with VPN Gateway (VpnGw1)
-- **Spoke 1** (`vnet-spoke-dbrx`, 10.1.0.0/16) — `vm-dbrx` + `rt-dbrx`
-- **Spoke 2** (`vnet-spoke-adls`, 10.2.0.0/16) — ADLS Gen2 private endpoint + `rt-adls`
+- **Spoke 1** (`vnet-spoke-dbrx`, 10.101.0.0/16) — `vm-dbrx` + `rt-dbrx`
+- **Spoke 2** (`vnet-spoke-adls`, 10.102.0.0/16) — ADLS Gen2 private endpoint + `rt-adls`
 - VNet peering with gateway transit forces spoke-to-spoke through the gateway
 - UDRs for forced tunneling
 
@@ -60,6 +60,6 @@ This project uses [OpenSpec](https://openspec.dev/) to define requirements and d
 
 ## Validation
 
-1. Check effective routes on nic-dbrx: 10.2.0.0/16 should show next hop = VirtualNetworkGateway
+1. Check effective routes on nic-dbrx: 10.102.0.0/16 should show next hop = VirtualNetworkGateway
 2. Run the traffic script and observe gateway PPS/throughput spike
 3. Apply fix (direct peering or NVA) and observe gateway metrics drop
