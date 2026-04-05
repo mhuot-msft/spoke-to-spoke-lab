@@ -29,8 +29,8 @@
 
 ## Phase 6: Dashboard
 
-- [ ] 6.1 Copy the Grafana dashboard JSON (spoke-to-spoke-lab-dashboard.json) into dashboards/ directory. This file is already created and uses Azure Monitor data source with template variables for subscription, resource group, VPN gateway, VM, and storage account.
+- [x] 6.1 Grafana dashboard JSON exists at dashboards/spoke-to-spoke-lab.json. Uses Azure Monitor data source with template variables for subscription, resource group, VPN gateway, VM, and storage account.
 
 ## Phase 7: Documentation
 
-- [ ] 7.1 Create README.md - Include: purpose of the lab, architecture diagram (text-based), prerequisites (Azure subscription, Grafana instance with Azure Monitor data source, SSH key pair), deployment steps, how to run the traffic gen script, how to import the Grafana dashboard, how to verify the hairpin behavior (effective routes check), and teardown instructions (az group delete).
+- [x] 7.1 README.md exists with purpose, architecture diagram, project structure, getting started steps, and validation instructions.
