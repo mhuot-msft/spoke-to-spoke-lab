@@ -55,10 +55,10 @@ bicep/
       vm-dbrx.bicep             # Ubuntu VM + NIC + NSG + public IP
     storage/
       adls-account.bicep        # Storage account (HNS enabled) + private endpoint
-  scripts/
-    traffic-gen.sh              # azcopy traffic generation script
-  dashboards/
-    spoke-to-spoke-lab.json     # Grafana dashboard definition
+scripts/
+  traffic-gen.sh                # azcopy traffic generation script (repo root)
+dashboards/
+  spoke-to-spoke-lab.json       # Grafana dashboard definition (repo root)
 ```
 
 ## Key Design Decisions
