@@ -1,0 +1,13 @@
+version: "1.0"
+project:
+  name: spoke-to-spoke-lab
+  description: Azure hub-and-spoke lab to simulate and measure spoke-to-spoke traffic hairpinning through a VPN gateway
+  tech_stack:
+    - Azure Bicep
+    - Azure CLI
+    - Grafana
+    - azcopy
+  conventions:
+    naming: "Resource names follow pattern: {type}-{purpose}-{env}"
+    modules: "One Bicep module per logical resource group (networking, compute, storage)"
+    parameters: "All configurable values exposed as parameters with sensible defaults"
