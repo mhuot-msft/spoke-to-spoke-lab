@@ -43,16 +43,14 @@ graph TD
 
 This project uses [OpenSpec](https://openspec.dev/) to define requirements and drive Bicep development.
 
-- `openspec/` - Project configuration
-- `specs/` - Source of truth specifications
-- `changes/` - Change proposals, designs, and tasks
+- `openspec/` - OpenSpec config, specs (source of truth), and change proposals/designs/tasks
 - `dashboards/` - Grafana dashboard JSON
 - `scripts/` - Traffic generation script
 - `diagrams/` - Architecture diagrams
 
 ## Getting Started
 
-1. Use an OpenSpec-compatible agent to build the Bicep modules from `changes/deploy-spoke-to-spoke-lab/tasks.md`
+1. Use an OpenSpec-compatible agent to build the Bicep modules from `openspec/changes/deploy-spoke-to-spoke-lab/tasks.md`
 2. Deploy with `az deployment group create`
 3. Import `dashboards/spoke-to-spoke-lab.json` into Grafana
 4. SSH to vm-dbrx and run `scripts/traffic-gen.sh`
