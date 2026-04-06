@@ -252,16 +252,17 @@ Gateway flows remained **essentially flat at 610–641** — the gateway is not 
 | Peering changes | — | DBX↔PE spoke direct peering added | **None** |
 | Infrastructure added | — | None | PE subnet + 2 PEs |
 
-### Fix 1: Direct Peering
+### Fix 1: Direct Peering (Recommended)
+- **Matches the real-world customer fix** — the Databricks team peered their spoke directly to the PE spoke
 - Removes the gateway from the data path entirely by fixing the routing architecture
 - Requires changes to route tables, peering settings, and adding spoke-to-spoke peering
-- Best when you want a clean network architecture without forced tunneling
+- Best for clean network architecture and when spoke-to-spoke direct communication is feasible
 
-### Fix 2: Adjacent Private Endpoint (Recommended)
+### Fix 2: Adjacent Private Endpoint
 - Bypasses the gateway without changing any routing or peering settings
 - The forced tunneling UDR remains active, but `/32 InterfaceEndpoint` routes override it
 - Minimally invasive — only adds a PE subnet and two private endpoints in the consumer's VNet
-- Best when you can't change the existing network architecture (e.g., shared hub managed by a central team)
+- Valid alternative when direct peering between spokes isn't feasible or when preserving all non-PE traffic inspection is required
 - **Note**: Ancillary traffic (AAD auth, DNS, etc.) still transits the gateway due to the catch-all UDR — only storage data is bypassed
 
 ### Other Approaches (Not Tested)
