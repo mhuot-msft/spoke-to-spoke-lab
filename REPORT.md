@@ -14,6 +14,24 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
 
 ---
 
+## Dashboard Overview — All Three Test Runs
+
+The screenshot below shows the complete Grafana dashboard across all three test configurations in a single view. Each vertical dashed line is a **Grafana annotation** marking a test boundary (begin or end), posted programmatically via the Grafana API using `scripts/grafana-annotate.ps1`. The annotations create clear visual markers that correlate events across all six panels simultaneously.
+
+Reading left to right, the three traffic bursts correspond to:
+
+1. **Broken state** (~13:05–13:21 UTC) — Gateway flows spike to 3.1K, all traffic hairpins
+2. **Direct Peering** (~13:29–13:44 UTC) — Gateway drops to baseline, traffic flows peer-to-peer
+3. **Adjacent PE** (~13:54–14:09 UTC) — Gateway remains flat, storage data stays in consumer spoke
+
+Each panel includes **min, max, and mean** values in the legend table for quantitative comparison. The gateway panels use a **fixed Y-axis (0–3,500)** so the flat baseline in Fix 2 is visually distinct from the broken state's spike — without fixed scaling, auto-scale would make the ~600 ancillary flows appear as volatile spikes.
+
+![Combined dashboard — all three test runs with annotations](dashboards/combined-annotations.png)
+
+The following sections break down each configuration in detail.
+
+---
+
 ## The Problem: VPN Gateway Hairpin
 
 > **Note on gateway type**: This lab uses a VPN gateway (VpnGw1), but the same hairpin behavior occurs with an **ExpressRoute gateway**. Both gateway types support `allowGatewayTransit` / `useRemoteGateways` on VNet peerings, and both will process spoke-to-spoke traffic when a catch-all UDR forces `0.0.0.0/0 → VirtualNetworkGateway`. The fixes demonstrated here — direct peering and adjacent private endpoints — apply equally to ExpressRoute environments.
