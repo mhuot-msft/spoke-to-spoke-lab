@@ -92,3 +92,95 @@ The system SHALL include a Grafana dashboard JSON definition that monitors VPN g
 - GIVEN the Grafana dashboard is imported and configured
 - WHEN the traffic generation script is running
 - THEN all panels show correlated increases in gateway throughput, VM network output, and storage ingress
+
+#### Scenario: Dashboard panels are legible in a single screenshot
+
+- GIVEN all 6 panels are arranged in a 3×2 grid
+- WHEN the dashboard is captured at 1400×1000 viewport in kiosk mode
+- THEN all panels fit in a single screenshot with legible text
+- AND each panel legend displays min, max, and mean values in table format
+
+#### Scenario: Storage metrics use appropriate time grain
+
+- GIVEN the storage panels query `Microsoft.Storage/storageAccounts/blobServices/default`
+- WHEN the time grain is PT5M
+- THEN storage ingress and egress are visible during 15-minute test windows
+
+#### Scenario: Gateway panels use fixed Y-axis for cross-state comparison
+
+- GIVEN the gateway panels have Y-axis fixed at 0–3500
+- WHEN screenshots are captured across broken, direct peering, and adjacent PE states
+- THEN the visual scale is consistent, making flat baselines clearly distinguishable from active traffic
+
+#### Scenario: Test annotations mark begin and end times
+
+- GIVEN a Grafana service account with Editor role exists
+- WHEN the grafana-annotate.ps1 script posts annotations via the Grafana API
+- THEN vertical markers appear on all panels at test begin and test complete times
+
+### Requirement: Remediation — Direct Spoke-to-Spoke Peering
+
+The system SHALL include an alternative Bicep configuration (`bicep/lab-fixed-direct-peering/`) that adds direct VNet peering between the two spokes and removes the catch-all UDR, so spoke-to-spoke traffic no longer transits the VPN gateway.
+
+#### Scenario: Direct peering eliminates gateway hairpin
+
+- GIVEN the direct peering configuration is deployed
+- WHEN vm-dbrx sends traffic to the ADLS private endpoint in spoke-adls
+- THEN effective routes on nic-dbrx show 10.102.0.0/16 with next hop type VNetPeering
+- AND VPN gateway flow count does not increase above idle baseline during traffic generation
+- AND storage ingress/egress metrics increase as expected
+
+### Requirement: Remediation — Adjacent Private Endpoint
+
+The system SHALL include an alternative Bicep configuration (`bicep/lab-fixed-adjacent-pe/`) that deploys private endpoints for the ADLS storage account in the consumer spoke (vnet-spoke-dbrx), so storage data plane traffic stays local to the spoke and bypasses the gateway.
+
+#### Scenario: Adjacent PE bypasses gateway for storage traffic
+
+- GIVEN the adjacent PE configuration is deployed with PEs in subnet-pe-dbrx (10.101.2.0/24)
+- WHEN vm-dbrx sends traffic to the ADLS DFS endpoint
+- THEN effective routes on nic-dbrx show /32 InterfaceEndpoint routes for PE IPs
+- AND the /32 routes override the catch-all 0.0.0.0/0 UDR for storage data plane traffic
+- AND VPN gateway flow count remains flat (ancillary traffic only — AAD auth, DNS)
+- AND the forced tunneling UDR remains active for all non-PE traffic
+
+### Requirement: Validation report
+
+The system SHALL include a validation report (REPORT.md) documenting the 3-state test sequence (broken, direct peering, adjacent PE) with Grafana screenshots, effective route tables, metric summaries, and a security/compliance analysis of each remediation approach.
+
+#### Scenario: Report proves hairpin in broken state
+
+- GIVEN the broken state is deployed with catch-all UDR and gateway transit
+- WHEN 15 minutes of sustained azcopy traffic runs
+- THEN the report shows VPN gateway flows increasing from idle to >3,000
+- AND effective routes confirm VirtualNetworkGateway next hop for 10.102.0.0/16
+
+#### Scenario: Report proves each fix eliminates gateway saturation
+
+- GIVEN each fix configuration is deployed and tested for 15 minutes
+- WHEN the report compares gateway metrics across all three states
+- THEN the broken state shows >3,000 gateway flows
+- AND the direct peering state shows gateway flows dropping to idle baseline
+- AND the adjacent PE state shows gateway flows remaining flat
+
+#### Scenario: Report includes security and compliance analysis
+
+- GIVEN the report contains a security and compliance section
+- WHEN the reader evaluates each fix
+- THEN the report addresses forced tunneling preservation, central inspection impact, NSG requirements, PE surface area, and compliance fit for each approach
+- AND includes a summary comparison table
+
+### Requirement: ExpressRoute and VWAN equivalence notes
+
+The report and README SHALL note that ExpressRoute gateways exhibit the same hairpin behavior as VPN gateways, and that Azure Virtual WAN is an alternative approach (not tested) that provides native spoke-to-spoke routing.
+
+#### Scenario: ER gateway equivalence is documented
+
+- GIVEN the report discusses the broken state
+- THEN it includes a callout that ExpressRoute gateways exhibit the same hairpin behavior
+- AND the README key findings reference this equivalence
+
+#### Scenario: VWAN alternative is documented
+
+- GIVEN the report conclusion section exists
+- THEN it includes a subsection describing VWAN as an untested alternative
+- AND notes that VWAN provides native spoke-to-spoke routing without manual peering or UDRs
