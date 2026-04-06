@@ -10,11 +10,11 @@ Full validation report with Grafana screenshots, effective routes, and metric co
 
 | Configuration | Gateway Flows (Max) | Gateway in data path? | Changes required |
 |--------------|--------------------|-----------------------|-----------------|
-| **Broken** (catch-all UDR) | **3,120** | Yes — all traffic | — |
-| **Fix 1: Direct Peering** | 600 (baseline) | **No** | UDR removed, gateway transit disabled, spoke-to-spoke peering added |
-| **Fix 2: Adjacent PE** ⭐ | 637 (flat) | **No** (storage data bypassed) | PE subnet + 2 private endpoints in consumer VNet |
+| **Broken** (catch-all UDR) | **2,956** | Yes — all traffic | — |
+| **Fix 1: Direct Peering** ⭐ | 627 (baseline) | **No** | UDR removed, gateway transit disabled, DBX↔PE spoke peering added |
+| **Fix 2: Adjacent PE** | 641 (flat) | **No** (storage data bypassed) | PE subnet + 2 private endpoints in consumer VNet |
 
-**Recommended fix**: Adjacent Private Endpoint — bypasses the gateway without changing any routing or peering settings. Best when you can't modify the existing network architecture (e.g., shared hub managed by a central team).
+**Recommended fix**: Direct Peering — removes the gateway from the data path entirely by peering the consumer spoke directly to the PE spoke. Clean, permanent fix with no residual hairpinning.
 
 **Azure Virtual WAN** would also address this issue by providing native spoke-to-spoke routing through the VWAN hub router, but requires migrating from traditional hub-and-spoke and was not tested here.
 
@@ -30,28 +30,35 @@ graph TD
         vpngw["VPN Gateway\nVpnGw1"]
     end
 
-    subgraph spoke1["Spoke 1 — vnet-spoke-dbrx (10.101.0.0/16)"]
+    subgraph spoke1["DBX Spoke — vnet-spoke-dbrx (10.101.0.0/16)"]
         vm["vm-dbrx\nLinux VM"]
         rt1["rt-dbrx\nUDR"]
     end
 
-    subgraph spoke2["Spoke 2 — vnet-spoke-adls (10.102.0.0/16)"]
-        adls["ADLS Gen2\nPrivate Endpoint"]
-        rt2["rt-adls\nUDR"]
+    subgraph spoke3["PE Spoke — vnet-spoke-pe (10.103.0.0/16)"]
+        pe["PE (DFS + Blob)\nPrivate Endpoints"]
+        rt3["rt-pe\nUDR"]
+    end
+
+    subgraph spoke2["ADLS Spoke — vnet-spoke-adls (10.102.0.0/16)"]
+        adls["ADLS Gen2\nStorage Account"]
     end
 
     spoke1 -- "VNet Peering\n(use gateway transit)" --> hub
+    spoke3 -- "VNet Peering\n(use gateway transit)" --> hub
     spoke2 -- "VNet Peering\n(use gateway transit)" --> hub
 
     vm -. "azcopy traffic\nhairpin path" .-> vpngw
-    vpngw -. "azcopy traffic\nhairpin path" .-> adls
+    vpngw -. "azcopy traffic\nhairpin path" .-> pe
+    pe -. "Azure backbone" .-> adls
 ```
 
 > For the detailed diagram see [diagrams/spoke-to-spoke-lab.excalidraw](diagrams/spoke-to-spoke-lab.excalidraw).
 
 - **Hub VNet** with VPN Gateway (VpnGw1)
-- **Spoke 1** (`vnet-spoke-dbrx`, 10.101.0.0/16) — `vm-dbrx` + `rt-dbrx`
-- **Spoke 2** (`vnet-spoke-adls`, 10.102.0.0/16) — ADLS Gen2 private endpoint + `rt-adls`
+- **DBX Spoke** (`vnet-spoke-dbrx`, 10.101.0.0/16) — `vm-dbrx` + `rt-dbrx`
+- **PE Spoke** (`vnet-spoke-pe`, 10.103.0.0/16) — DFS + Blob private endpoints + `rt-pe`
+- **ADLS Spoke** (`vnet-spoke-adls`, 10.102.0.0/16) — Storage account
 - VNet peering with gateway transit forces spoke-to-spoke through the gateway
 - UDRs for forced tunneling
 
