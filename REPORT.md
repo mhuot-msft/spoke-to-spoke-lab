@@ -11,7 +11,7 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
 **Test environment**: Azure hub-and-spoke lab in `rg-spoke-to-spoke-lab` (centralus)  
 **Test workload**: 1 GB file upload/download cycles between `vm-dbrx` (Spoke 1) and ADLS Gen2 private endpoint (Spoke 2) using azcopy  
 **Test duration**: 15 minutes per configuration  
-**Date**: 2026-04-05 / 2026-04-06
+**Date**: 2026-04-06
 
 ---
 
@@ -33,33 +33,32 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
                             traffic hairpins here
 ```
 
-In this configuration, User-Defined Routes (UDRs) on both spokes force a default route (`0.0.0.0/0 → VirtualNetworkGateway`). Combined with `useRemoteGateways: true` on spoke peerings and `allowGatewayTransit: true` on hub peerings, all spoke-to-spoke traffic is forced through the VPN gateway — even though the spokes are in the same region and could communicate via VNet peering directly.
+User-Defined Routes (UDRs) on both spokes force a default route (`0.0.0.0/0 → VirtualNetworkGateway`). Combined with `useRemoteGateways: true` on spoke peerings and `allowGatewayTransit: true` on hub peerings, **all** spoke-to-spoke traffic is forced through the VPN gateway — even though the spokes are in the same region.
 
 ### Effective Routes (Broken)
 
 ```
-Source    State    Address Prefix    Next Hop Type            
+Source    State    Address Prefix    Next Hop Type
 ────────  ───────  ────────────────  ─────────────────────────
-Default   Active   10.101.0.0/16     VnetLocal               
-Default   Active   10.100.0.0/16     VNetPeering             
-User      Active   0.0.0.0/0         VirtualNetworkGateway   ◄── Forces all traffic through gateway
-User      Active   68.47.19.27/32    Internet                
+Default   Active   10.101.0.0/16     VnetLocal
+Default   Active   10.100.0.0/16     VNetPeering
+User      Active   0.0.0.0/0         VirtualNetworkGateway   ◄── Forces ALL traffic through gateway
+User      Active   68.47.19.27/32    Internet
 Default   Invalid  0.0.0.0/0         Internet                ◄── Overridden by UDR
 ```
 
-**Key observation**: There is NO route for `10.102.0.0/16` (Spoke 2). Traffic to the ADLS private endpoint falls under the `0.0.0.0/0 → VirtualNetworkGateway` catch-all, forcing it through the VPN gateway.
+**Key observation**: No route for `10.102.0.0/16` (Spoke 2). Traffic to the ADLS private endpoint (`10.102.2.4`) falls under the `0.0.0.0/0 → VirtualNetworkGateway` catch-all.
 
-### Grafana Metrics — Broken State (23:18–23:33 UTC)
+### Grafana — Broken State (04:22–04:37 UTC)
 
 | Metric | Observation |
 |--------|-------------|
-| Gateway Inbound/Outbound Flows | **Ramped from ~500 to ~3,000 flows** — confirms traffic transiting gateway |
-| Gateway S2S Bandwidth | Low but active — gateway processing spoke-to-spoke packets |
-| VM Network Out | ~20 GB during test — uploading 1 GB files in cycles |
-| VM Network In | ~20 GB during test — downloading 1 GB files in cycles |
+| Gateway Inbound/Outbound Flows | Ramped from **~600 baseline to ~1,500** — traffic transiting gateway |
+| VM Network Out | ~4.5 MB — uploading 1 GB files in cycles |
+| VM Network In | Spike to ~25 MB, settling ~5 MB — download traffic |
+| Storage Ingress/Egress | Flat (Azure Monitor hourly aggregation lag) |
 
-![Broken state — Gateway and VM metrics](dashboards/broken-top.png)
-![Broken state — VM and Storage metrics](dashboards/broken-bottom.png)
+![Broken state — Gateway flows elevated, all traffic through gateway](dashboards/broken.png)
 
 ---
 
@@ -67,15 +66,14 @@ Default   Invalid  0.0.0.0/0         Internet                ◄── Overridde
 
 ### Changes Applied
 
-| Change | Before (Broken) | After (Fixed) |
-|--------|-----------------|---------------|
+| Change | Before (Broken) | After (Direct Peering) |
+|--------|-----------------|------------------------|
 | Route tables | `0.0.0.0/0 → VirtualNetworkGateway` | Route **removed** |
 | Hub→Spoke peering | `allowGatewayTransit: true` | `allowGatewayTransit: false` |
 | Spoke→Hub peering | `useRemoteGateways: true` | `useRemoteGateways: false` |
-| Spoke↔Spoke peering | None | **Direct peering** between vnet-spoke-dbrx ↔ vnet-spoke-adls |
-| VPN Gateway | In data path | Still exists but **NOT** in spoke-to-spoke path |
+| Spoke↔Spoke peering | None | **Direct peering** vnet-spoke-dbrx ↔ vnet-spoke-adls |
 
-### Architecture (Fixed State)
+### Architecture (Direct Peering)
 
 ```
   Spoke 1 (vm-dbrx)          Hub (vnet-hub)          Spoke 2 (ADLS PE)
@@ -85,39 +83,32 @@ Default   Invalid  0.0.0.0/0         Internet                ◄── Overridde
        │                           │                       │
        ├──── peering ──────────────┤───── peering ─────────┤
        │  (no gateway transit)     │  (no gateway transit) │
-       │                           │                       │
+       │                                                   │
        └───────── direct peering ──────────────────────────┘
-                  Traffic goes HERE now
-                  (bypasses gateway entirely)
+                  Traffic goes HERE now (bypasses gateway)
 ```
 
-### Effective Routes (Fixed)
+### Effective Routes (Direct Peering)
 
 ```
-Source    State    Address Prefix    Next Hop Type            
+Source    State    Address Prefix    Next Hop Type
 ────────  ───────  ────────────────  ─────────────────────────
-Default   Active   10.101.0.0/16     VnetLocal               
-Default   Active   10.100.0.0/16     VNetPeering             
-Default   Active   10.102.0.0/16     VNetPeering             ◄── NEW: Direct route to Spoke 2
-Default   Active   0.0.0.0/0         Internet                ◄── Default (no more forced tunneling)
-User      Active   68.47.19.27/32    Internet                
-Default   Active   10.102.2.4/32     InterfaceEndpoint       ◄── DFS private endpoint
-Default   Active   10.102.2.5/32     InterfaceEndpoint       ◄── Blob private endpoint
+Default   Active   10.101.0.0/16     VnetLocal
+Default   Active   10.100.0.0/16     VNetPeering
+Default   Active   10.102.0.0/16     VNetPeering             ◄── Direct route to Spoke 2
+Default   Active   0.0.0.0/0         Internet                ◄── Default (no forced tunneling)
+User      Active   68.47.19.27/32    Internet
 ```
 
-**Key observation**: `10.102.0.0/16` now appears as a `VNetPeering` route — traffic to the ADLS private endpoint goes directly via VNet peering without touching the VPN gateway.
-
-### Grafana Metrics — Fixed State (23:36–23:51 UTC)
+### Grafana — Direct Peering (04:47–05:03 UTC)
 
 | Metric | Observation |
 |--------|-------------|
-| Gateway Inbound/Outbound Flows | **Dropped from ~3,000 to ~700** — gateway no longer processing spoke-to-spoke data |
-| Gateway S2S Bandwidth | Flatlined to ~0 B/s — no spoke-to-spoke traffic through gateway |
-| VM Network Out | ~18 GB during test — **same throughput** as broken state |
-| VM Network In | ~18 GB during test — **same throughput** as broken state |
+| Gateway Inbound/Outbound Flows | **Dropped from ~1,400 to ~600 baseline** — gateway idle |
+| VM Network Out | ~4.5 MB — same throughput as broken state |
+| VM Network In | Spike to ~25 MB, settling ~5 MB |
 
-![Fixed state — Gateway flows drop, VM traffic continues](dashboards/fixed-top.png)
-![Fixed state — VM and Storage metrics](dashboards/fixed-bottom.png)
+![Direct peering — Gateway drops to baseline, traffic bypasses gateway](dashboards/direct-peering.png)
 
 ---
 
@@ -125,17 +116,15 @@ Default   Active   10.102.2.5/32     InterfaceEndpoint       ◄── Blob priv
 
 ### Concept
 
-Instead of changing routing or peering, place private endpoints for the storage account **in the consumer's VNet** (vnet-spoke-dbrx). The VM connects to a local PE IP (10.101.2.x) instead of the remote PE in spoke-adls (10.102.2.x).
+Place private endpoints for the storage account **in the consumer's VNet** (vnet-spoke-dbrx). The VM connects to a local PE IP (`10.101.2.x`) instead of the remote PE (`10.102.2.x`). Azure creates `/32 InterfaceEndpoint` routes that are more specific than the `0.0.0.0/0` UDR, completely bypassing the forced tunneling path.
 
-This works because Azure creates `/32 InterfaceEndpoint` routes for local private endpoints. These are more specific than the `0.0.0.0/0` UDR and use `VnetLocal` next hop — completely bypassing the forced tunneling path through the VPN gateway.
-
-**Key advantage**: No changes to route tables, peering, or gateway transit settings. The existing "broken" routing remains intact, but traffic to the storage account stays local.
+**Key advantage**: No changes to route tables, peering, or gateway transit. The existing "broken" routing remains intact, but storage traffic stays local.
 
 ### Changes Applied
 
 | Change | Before (Broken) | After (Adjacent PE) |
 |--------|-----------------|---------------------|
-| Route tables | `0.0.0.0/0 → VirtualNetworkGateway` | **Unchanged** — UDR still active |
+| Route tables | `0.0.0.0/0 → VirtualNetworkGateway` | **Unchanged** |
 | Hub↔Spoke peering | `allowGatewayTransit: true` | **Unchanged** |
 | Spoke→Hub peering | `useRemoteGateways: true` | **Unchanged** |
 | vnet-spoke-dbrx subnets | `subnet-dbrx` only | Added `subnet-pe` (10.101.2.0/24) |
@@ -177,31 +166,29 @@ Default   Active   10.101.2.4/32     InterfaceEndpoint       ◄── Local DFS
 Default   Active   10.101.2.5/32     InterfaceEndpoint       ◄── Local Blob PE (/32 overrides UDR)
 ```
 
-**Key observation**: The forced tunneling UDR (`0.0.0.0/0 → VirtualNetworkGateway`) is still active, but the `/32 InterfaceEndpoint` routes for the local PEs at `10.101.2.4` and `10.101.2.5` are more specific and take priority. Traffic to the storage account stays within vnet-spoke-dbrx.
+**Key observation**: The `/32 InterfaceEndpoint` routes at `10.101.2.4` and `10.101.2.5` override the catch-all UDR. Traffic to the storage account stays within vnet-spoke-dbrx.
 
-### Grafana Metrics — Adjacent PE (00:11–00:26 UTC)
+### Grafana — Adjacent PE (05:10–05:25 UTC)
 
 | Metric | Observation |
 |--------|-------------|
-| Gateway Inbound/Outbound Flows | **~615-650** — baseline management probes only, identical to idle gateway |
-| Gateway S2S Bandwidth | **0 B/s** — flat zero, no data through gateway |
-| VM Network Out | ~20 GB during test — **same throughput** as all other tests |
-| VM Network In | ~20 GB during test — **same throughput** as all other tests |
+| Gateway Inbound/Outbound Flows | **~610-635** — pure baseline, gateway completely idle |
+| VM Network Out | ~4.5 MB — same throughput |
+| VM Network In | Spike to ~25 MB, settling ~5 MB |
 
-![Adjacent PE — Gateway at baseline, VM traffic active](dashboards/adjacent-pe-top.png)
-![Adjacent PE — VM and Storage metrics](dashboards/adjacent-pe-bottom.png)
+![Adjacent PE — Gateway at pure baseline, traffic stays local](dashboards/adjacent-pe.png)
 
 ---
 
-## Fix 3: Specific UDR Routes (⚠️ Works, Still Hairpins)
+## Fix 3: Specific UDR Routes
 
 ### Concept
 
-Replace the catch-all UDR (`0.0.0.0/0 → VirtualNetworkGateway`) with **specific routes only for spoke-to-spoke traffic**. Each spoke gets a UDR targeting only the remote spoke's address prefix. Internet and other traffic uses the default system routes instead of being forced through the gateway.
+Replace the catch-all UDR (`0.0.0.0/0 → VirtualNetworkGateway`) with **specific routes only for spoke-to-spoke traffic**. Each spoke gets a UDR targeting only the remote spoke's address prefix. Internet and other traffic uses default system routes.
 
-This approach still hairpins spoke-to-spoke traffic through the VPN gateway, but reduces overall gateway load by not forcing all other traffic through it.
+Traffic still hairpins through the gateway for spoke-to-spoke, but the gateway no longer processes all other traffic (DNS, NTP, management, internet).
 
-**Note**: Simply *removing* the catch-all UDR (without adding specific routes) breaks connectivity entirely. Azure's RFC1918 blackhole routes (`10.0.0.0/8 → None`) drop traffic to the remote spoke's PE IP. The specific routes override the blackhole for spoke-to-spoke traffic while letting other traffic use default routing.
+**Important**: Simply *removing* the catch-all UDR without adding specific routes **breaks connectivity** — Azure's RFC1918 blackhole routes (`10.0.0.0/8 → None`) drop traffic to the remote spoke's PE IP.
 
 ### Changes Applied
 
@@ -211,7 +198,7 @@ This approach still hairpins spoke-to-spoke traffic through the VPN gateway, but
 | rt-adls routes | `0.0.0.0/0 → VirtualNetworkGateway` | `10.101.0.0/16 → VirtualNetworkGateway` |
 | Hub↔Spoke peering | `allowGatewayTransit: true` | **Unchanged** |
 | Spoke→Hub peering | `useRemoteGateways: true` | **Unchanged** |
-| Default route | `0.0.0.0/0 → VirtualNetworkGateway` | `0.0.0.0/0 → Internet` (system default restored) |
+| Default route | Overridden by UDR | `0.0.0.0/0 → Internet` (system default restored) |
 
 ### Architecture (Specific UDR)
 
@@ -227,7 +214,7 @@ This approach still hairpins spoke-to-spoke traffic through the VPN gateway, but
                                     │
                             ONLY spoke-to-spoke
                             traffic hairpins here
-                            (other traffic uses Internet)
+                            (other traffic uses Internet default)
 ```
 
 ### Effective Routes (Specific UDR)
@@ -238,30 +225,22 @@ Source    State    Address Prefix    Next Hop Type
 Default   Active   10.101.0.0/16     VnetLocal
 Default   Active   10.100.0.0/16     VNetPeering
 User      Active   10.102.0.0/16     VirtualNetworkGateway   ◄── Specific spoke-to-spoke only
-Default   Active   0.0.0.0/0         Internet                ◄── Default restored (not forced through GW)
+Default   Active   0.0.0.0/0         Internet                ◄── Default restored
 User      Active   68.47.19.27/32    Internet
-Default   Active   10.0.0.0/8        None                    ◄── Blackhole (overridden by /16 for spoke-adls)
+Default   Active   10.0.0.0/8        None                    ◄── Overridden by /16 for spoke-adls
 ```
 
-**Key observation**: The specific route `10.102.0.0/16 → VirtualNetworkGateway` is more specific than the `10.0.0.0/8 → None` blackhole, so spoke-to-spoke traffic reaches the gateway. But unlike the broken state, all other traffic (DNS, NTP, internet) uses the default `0.0.0.0/0 → Internet` route instead of being forced through the gateway.
+**Key observation**: The `/16` route overrides the `10.0.0.0/8 → None` blackhole for spoke-to-spoke traffic, while other traffic uses the default `0.0.0.0/0 → Internet` route instead of being forced through the gateway.
 
-### Grafana Metrics — Specific UDR (02:01–02:16 UTC)
+### Grafana — Specific UDR (05:31–05:46 UTC)
 
 | Metric | Observation |
 |--------|-------------|
-| Gateway Inbound/Outbound Flows | **~1,500** — elevated but **50% less than broken state** (~3,000) |
-| VM Network Out | ~5 MB — active upload traffic |
-| VM Network In | ~5 MB — active download traffic |
-| Storage Ingress/Egress | Flat — Azure Monitor lag (traffic confirmed by VM metrics and azcopy completion) |
+| Gateway Inbound/Outbound Flows | Ramped from **~600 to ~1,400** — spoke-to-spoke still transits gateway |
+| VM Network Out | ~5.5 MB — same throughput |
+| VM Network In | Spike to ~25 MB, settling ~5 MB |
 
-![Specific UDR — Gateway flows at ~1,500, VM traffic active](dashboards/udr-top.png)
-![Specific UDR — Storage metrics (Azure Monitor lag)](dashboards/udr-bottom.png)
-
-### Analysis
-
-The specific UDR approach **works** but does not eliminate the gateway from the spoke-to-spoke data path. Gateway flows (~1,500) are about **50% lower** than the broken state (~3,000) because only traffic matching `10.102.0.0/16` transits the gateway — all other traffic (management, DNS, internet) uses the default route.
-
-This is an improvement over the broken catch-all UDR but still less optimal than Fix 1 (direct peering, ~700 flows) or Fix 2 (adjacent PE, ~630 flows), which remove the gateway from the data path entirely.
+![Specific UDR — Gateway flows elevated, spoke-to-spoke still hairpins](dashboards/specific-udr.png)
 
 ---
 
@@ -272,9 +251,9 @@ This is an improvement over the broken catch-all UDR but still less optimal than
 | Metric | Broken (Hairpin) | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) | Fix 3 (Specific UDR) |
 |--------|-----------------|----------------------|---------------------|----------------------|
 | **Status** | ⚠️ Working (inefficient) | ✅ Working | ✅ Working | ⚠️ Working (still hairpins) |
-| Gateway Flows | **~3,000** | ~700 (↓77%) | **~630** (↓79%) | ~1,500 (↓50%) |
+| Gateway Flows | **~1,500** | ~600 (baseline) | **~610** (baseline) | ~1,400 |
 | Gateway in data path? | Yes (all traffic) | **No** | **No** | Yes (spoke-to-spoke only) |
-| VM Throughput | ~18 GB | ~18 GB | **~20 GB** | ~18 GB |
+| VM Throughput | ~4.5 MB/interval | ~4.5 MB/interval | ~4.5 MB/interval | ~5.5 MB/interval |
 | Routing changes | — | UDR removed, gateway transit disabled | **None** | Catch-all → specific routes |
 | Peering changes | — | Spoke-to-spoke peering added | **None** | **None** |
 | Infrastructure added | — | None | PE subnet + 2 PEs | None |
@@ -292,10 +271,10 @@ This is an improvement over the broken catch-all UDR but still less optimal than
 
 ### Fix 3: Specific UDR Routes
 - Replaces the catch-all `0.0.0.0/0 → VirtualNetworkGateway` with targeted spoke-to-spoke routes
-- Reduces gateway load by ~50% (only spoke-to-spoke traffic transits the gateway)
-- **Still hairpins** spoke-to-spoke traffic through the gateway — does not eliminate the bottleneck
-- Useful as a quick improvement when you cannot change peering or add PEs, but not a full solution
-- **Important**: Simply removing the UDR without adding specific routes breaks connectivity due to Azure's `10.0.0.0/8 → None` blackhole
+- Gateway still processes spoke-to-spoke traffic but not other traffic (DNS, internet, management)
+- **Still hairpins** — does not eliminate the gateway bottleneck for spoke-to-spoke
+- Useful as a quick improvement when you cannot change peering or add PEs
+- **Caution**: Simply removing the UDR without adding specific routes breaks connectivity due to `10.0.0.0/8 → None` blackhole
 
 ### Bicep Configurations
 
