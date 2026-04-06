@@ -230,6 +230,41 @@ Gateway flows remained **essentially flat at 588–637** — the gateway is not 
 
 **Azure Virtual WAN (VWAN)** would also address this issue. VWAN's hub provides native spoke-to-spoke routing without requiring manual peering or UDRs — the VWAN hub router automatically learns spoke prefixes and forwards traffic directly between spokes. In a VWAN topology, spoke-to-spoke traffic does not hairpin through the VPN or ExpressRoute gateway; it is routed through the VWAN hub router at no additional gateway cost. VWAN also supports routing intent and policies that provide more granular control over inter-spoke traffic flows. However, VWAN requires migrating from a traditional hub-and-spoke architecture and was not tested in this lab.
 
+### Security and Compliance Implications
+
+Each fix has different security posture trade-offs. Organizations subject to regulatory controls (e.g., PCI-DSS, HIPAA, FedRAMP) should evaluate these carefully.
+
+#### Broken State (Baseline)
+- **Forced tunneling**: All traffic (`0.0.0.0/0`) routes through the gateway, providing a **central inspection point** — this is often a compliance requirement for environments mandating egress filtering or network-level DLP
+- **Gateway as chokepoint**: The gateway sees all flows, enabling logging, IDS/IPS integration, and traffic analytics
+- **Risk**: Gateway saturation degrades availability — PPS and throughput limits can cause packet drops, impacting SLA compliance
+
+#### Fix 1: Direct Peering
+- **Removes forced tunneling entirely** — spoke-to-spoke and internet traffic no longer transits the gateway
+- **No central inspection point**: Traffic between spokes bypasses the hub completely. If your compliance framework requires all inter-VNet traffic to pass through a firewall or NVA for inspection, this fix **violates that requirement**
+- **Mitigation**: Deploy an Azure Firewall or NVA in the hub and route spoke-to-spoke traffic through it instead of the gateway. This was not implemented in this lab.
+- **NSG enforcement**: Without forced tunneling, NSGs on spoke subnets become the primary network-level control — ensure they are configured to restrict lateral movement between spokes
+- **Private endpoint security**: Data still flows over private endpoints (no public internet exposure), maintaining data-in-transit confidentiality
+
+#### Fix 2: Adjacent Private Endpoint
+- **Preserves forced tunneling** — the catch-all UDR remains active, maintaining the central inspection/logging posture for all non-PE traffic
+- **Storage data bypasses the gateway** via `/32 InterfaceEndpoint` routes, but stays entirely within the Azure backbone (PE-to-PE, never touches the internet)
+- **Ancillary traffic still inspected**: AAD auth, DNS, management traffic continues through the gateway — compliance logging for authentication flows is maintained
+- **Private Link compliance**: Data plane traffic uses Azure Private Link, which satisfies most data-sovereignty and data-in-transit requirements (encrypted within Azure backbone)
+- **Additional PE surface area**: Two new private endpoints in the consumer VNet mean additional resources to govern — ensure PE approval workflows, DNS zone policies, and RBAC are applied consistently
+- **Best compliance fit**: For environments requiring forced tunneling for audit/inspection purposes, adjacent PE is the **least disruptive** fix because it preserves the existing network security architecture
+
+#### Summary
+
+| Concern | Broken | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) |
+|---------|--------|----------------------|---------------------|
+| Forced tunneling preserved | ✅ Yes | ❌ **Removed** | ✅ Yes |
+| Central inspection point | ✅ Gateway sees all traffic | ❌ Gateway bypassed | ⚠️ Gateway sees ancillary traffic |
+| Data stays on private network | ✅ PE traffic | ✅ PE traffic | ✅ PE traffic |
+| Gateway saturation risk | ⚠️ **High** | ✅ None | ✅ None (storage data bypassed) |
+| NSG as primary control | ⚠️ UDR overrides | ✅ Required | ⚠️ UDR still active |
+| Compliance change required | — | ⚠️ May violate forced tunneling mandate | ✅ Minimal |
+
 ### Bicep Configurations
 
 All three states are codified as self-contained Bicep deployments:
