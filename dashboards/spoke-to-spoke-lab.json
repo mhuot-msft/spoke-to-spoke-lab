@@ -15,10 +15,10 @@
       "id": 2,
       "title": "Gateway Inbound Flows",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 0.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -45,8 +45,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -83,10 +88,10 @@
       "id": 3,
       "title": "Gateway Outbound Flows",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 0.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -113,8 +118,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -151,10 +161,10 @@
       "id": 5,
       "title": "VM Network Out (Bytes)",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 8.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -178,8 +188,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -216,10 +231,10 @@
       "id": 6,
       "title": "VM Network In (Bytes)",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 8.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -243,8 +258,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -281,10 +301,10 @@
       "id": 7,
       "title": "Storage Ingress (Bytes)",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 16.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -308,8 +328,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -319,18 +344,18 @@
           "azureMonitor": {
             "resources": [
               {
-                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01",
-                "metricNamespace": "Microsoft.Storage/storageAccounts"
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01/blobServices/default",
+                "metricNamespace": "Microsoft.Storage/storageAccounts/blobServices"
               }
             ],
             "metricName": "Ingress",
             "aggregation": "Total",
-            "timeGrain": "PT1H",
+            "timeGrain": "PT5M",
             "dimensionFilters": [],
-            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "metricNamespace": "Microsoft.Storage/storageAccounts/blobServices",
             "resourceGroup": "rg-spoke-to-spoke-lab",
-            "resourceName": "saadlslabmh01",
-            "metricDefinition": "Microsoft.Storage/storageAccounts",
+            "resourceName": "saadlslabmh01/default",
+            "metricDefinition": "Microsoft.Storage/storageAccounts/blobServices",
             "region": "centralus"
           },
           "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
@@ -346,10 +371,10 @@
       "id": 8,
       "title": "Storage Egress (Bytes)",
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 16.0
       },
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
@@ -373,8 +398,13 @@
           "mode": "multi"
         },
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ]
         }
       },
       "targets": [
@@ -384,18 +414,18 @@
           "azureMonitor": {
             "resources": [
               {
-                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01",
-                "metricNamespace": "Microsoft.Storage/storageAccounts"
+                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Storage/storageAccounts/saadlslabmh01/blobServices/default",
+                "metricNamespace": "Microsoft.Storage/storageAccounts/blobServices"
               }
             ],
             "metricName": "Egress",
             "aggregation": "Total",
-            "timeGrain": "PT1H",
+            "timeGrain": "PT5M",
             "dimensionFilters": [],
-            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "metricNamespace": "Microsoft.Storage/storageAccounts/blobServices",
             "resourceGroup": "rg-spoke-to-spoke-lab",
-            "resourceName": "saadlslabmh01",
-            "metricDefinition": "Microsoft.Storage/storageAccounts",
+            "resourceName": "saadlslabmh01/default",
+            "metricDefinition": "Microsoft.Storage/storageAccounts/blobServices",
             "region": "centralus"
           },
           "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",

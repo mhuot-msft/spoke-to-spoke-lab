@@ -6,7 +6,6 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
 
 1. **Direct Peering** — Remove forced tunneling UDR, disable gateway transit, add spoke-to-spoke VNet peering ✅
 2. **Adjacent Private Endpoint** — Place private endpoints in the consumer's VNet so traffic stays local ✅
-3. **Specific UDR** — Replace the catch-all UDR with targeted spoke-to-spoke routes ⚠️ (works, but still hairpins)
 
 **Test environment**: Azure hub-and-spoke lab in `rg-spoke-to-spoke-lab` (centralus)  
 **Test workload**: 1 GB file upload/download cycles between `vm-dbrx` (Spoke 1) and ADLS Gen2 private endpoint (Spoke 2) using azcopy  
@@ -180,83 +179,19 @@ Default   Active   10.101.2.5/32     InterfaceEndpoint       ◄── Local Blo
 
 ---
 
-## Fix 3: Specific UDR Routes
-
-### Concept
-
-Replace the catch-all UDR (`0.0.0.0/0 → VirtualNetworkGateway`) with **specific routes only for spoke-to-spoke traffic**. Each spoke gets a UDR targeting only the remote spoke's address prefix. Internet and other traffic uses default system routes.
-
-Traffic still hairpins through the gateway for spoke-to-spoke, but the gateway no longer processes all other traffic (DNS, NTP, management, internet).
-
-**Important**: Simply *removing* the catch-all UDR without adding specific routes **breaks connectivity** — Azure's RFC1918 blackhole routes (`10.0.0.0/8 → None`) drop traffic to the remote spoke's PE IP.
-
-### Changes Applied
-
-| Change | Before (Broken) | After (Specific UDR) |
-|--------|-----------------|----------------------|
-| rt-dbrx routes | `0.0.0.0/0 → VirtualNetworkGateway` | `10.102.0.0/16 → VirtualNetworkGateway` |
-| rt-adls routes | `0.0.0.0/0 → VirtualNetworkGateway` | `10.101.0.0/16 → VirtualNetworkGateway` |
-| Hub↔Spoke peering | `allowGatewayTransit: true` | **Unchanged** |
-| Spoke→Hub peering | `useRemoteGateways: true` | **Unchanged** |
-| Default route | Overridden by UDR | `0.0.0.0/0 → Internet` (system default restored) |
-
-### Architecture (Specific UDR)
-
-```
-  Spoke 1 (vm-dbrx)          Hub (vnet-hub)          Spoke 2 (ADLS PE)
-  10.101.0.0/16               10.100.0.0/16           10.102.0.0/16
-       │                           │                       │
-       │  UDR: 10.102.0.0/16      │    UDR: 10.101.0.0/16 │
-       │  → VirtualNetworkGateway  │    → VirtualNetworkGw │
-       │                           │                       │
-       └──── peering ─────► VPN Gateway ◄──── peering ─────┘
-              (useRemoteGw=true)    │    (allowGwTransit=true)
-                                    │
-                            ONLY spoke-to-spoke
-                            traffic hairpins here
-                            (other traffic uses Internet default)
-```
-
-### Effective Routes (Specific UDR)
-
-```
-Source    State    Address Prefix    Next Hop Type
-────────  ───────  ────────────────  ─────────────────────────
-Default   Active   10.101.0.0/16     VnetLocal
-Default   Active   10.100.0.0/16     VNetPeering
-User      Active   10.102.0.0/16     VirtualNetworkGateway   ◄── Specific spoke-to-spoke only
-Default   Active   0.0.0.0/0         Internet                ◄── Default restored
-User      Active   68.47.19.27/32    Internet
-Default   Active   10.0.0.0/8        None                    ◄── Overridden by /16 for spoke-adls
-```
-
-**Key observation**: The `/16` route overrides the `10.0.0.0/8 → None` blackhole for spoke-to-spoke traffic, while other traffic uses the default `0.0.0.0/0 → Internet` route instead of being forced through the gateway.
-
-### Grafana — Specific UDR (05:31–05:46 UTC)
-
-| Metric | Observation |
-|--------|-------------|
-| Gateway Inbound/Outbound Flows | Ramped from **~600 to ~1,400** — spoke-to-spoke still transits gateway |
-| VM Network Out | ~5.5 MB — same throughput |
-| VM Network In | Spike to ~25 MB, settling ~5 MB |
-
-![Specific UDR — Gateway flows elevated, spoke-to-spoke still hairpins](dashboards/specific-udr.png)
-
----
-
 ## Conclusion
 
 ### Comparison of All Configurations
 
-| Metric | Broken (Hairpin) | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) | Fix 3 (Specific UDR) |
-|--------|-----------------|----------------------|---------------------|----------------------|
-| **Status** | ⚠️ Working (inefficient) | ✅ Working | ✅ Working | ⚠️ Working (still hairpins) |
-| Gateway Flows | **~1,500** | ~600 (baseline) | **~610** (baseline) | ~1,400 |
-| Gateway in data path? | Yes (all traffic) | **No** | **No** | Yes (spoke-to-spoke only) |
-| VM Throughput | ~4.5 MB/interval | ~4.5 MB/interval | ~4.5 MB/interval | ~5.5 MB/interval |
-| Routing changes | — | UDR removed, gateway transit disabled | **None** | Catch-all → specific routes |
-| Peering changes | — | Spoke-to-spoke peering added | **None** | **None** |
-| Infrastructure added | — | None | PE subnet + 2 PEs | None |
+| Metric | Broken (Hairpin) | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) |
+|--------|-----------------|----------------------|---------------------|
+| **Status** | ⚠️ Working (inefficient) | ✅ Working | ✅ Working |
+| Gateway Flows | **~1,500** | ~0 (idle) | ~600 (ancillary only) |
+| Gateway in data path? | Yes (all traffic) | **No** | **No** (storage data bypassed) |
+| VM Throughput | ~4.5 MB/interval | ~4.5 MB/interval | ~4.5 MB/interval |
+| Routing changes | — | UDR removed, gateway transit disabled | **None** |
+| Peering changes | — | Spoke-to-spoke peering added | **None** |
+| Infrastructure added | — | None | PE subnet + 2 PEs |
 
 ### Fix 1: Direct Peering
 - Removes the gateway from the data path entirely by fixing the routing architecture
@@ -268,22 +203,15 @@ Default   Active   10.0.0.0/8        None                    ◄── Overridde
 - The forced tunneling UDR remains active, but `/32 InterfaceEndpoint` routes override it
 - Minimally invasive — only adds a PE subnet and two private endpoints in the consumer's VNet
 - Best when you can't change the existing network architecture (e.g., shared hub managed by a central team)
-
-### Fix 3: Specific UDR Routes
-- Replaces the catch-all `0.0.0.0/0 → VirtualNetworkGateway` with targeted spoke-to-spoke routes
-- Gateway still processes spoke-to-spoke traffic but not other traffic (DNS, internet, management)
-- **Still hairpins** — does not eliminate the gateway bottleneck for spoke-to-spoke
-- Useful as a quick improvement when you cannot change peering or add PEs
-- **Caution**: Simply removing the UDR without adding specific routes breaks connectivity due to `10.0.0.0/8 → None` blackhole
+- **Note**: Ancillary traffic (AAD auth, DNS, etc.) still transits the gateway due to the catch-all UDR — only storage data is bypassed
 
 ### Bicep Configurations
 
-All four states are codified as self-contained Bicep deployments:
+All three states are codified as self-contained Bicep deployments:
 
 - **`bicep/lab-current/`** — Reproduces the broken hairpin state
 - **`bicep/lab-fixed-direct-peering/`** — Fix 1: Direct spoke-to-spoke peering
 - **`bicep/lab-fixed-adjacent-pe/`** — Fix 2: Adjacent private endpoints in consumer VNet
-- **`bicep/lab-fixed-udr/`** — Fix 3: Specific UDR routes for spoke-to-spoke traffic
 
 Deploy any configuration with:
 ```bash
