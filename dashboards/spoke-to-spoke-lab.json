@@ -56,6 +56,8 @@
             "showPoints": "auto",
             "pointSize": 5
           },
+          "min": 0,
+          "max": 3500,
           "unit": "short"
         },
         "overrides": []
@@ -129,6 +131,8 @@
             "showPoints": "auto",
             "pointSize": 5
           },
+          "min": 0,
+          "max": 3500,
           "unit": "short"
         },
         "overrides": []
