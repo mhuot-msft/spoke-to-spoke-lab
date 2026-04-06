@@ -24,7 +24,7 @@
     {
       "type": "timeseries",
       "id": 2,
-      "title": "Gateway Inbound / Outbound Flows",
+      "title": "Gateway Inbound Flows",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -42,7 +42,7 @@
           },
           "custom": {
             "lineWidth": 2,
-            "fillOpacity": 0,
+            "fillOpacity": 15,
             "gradientMode": "none",
             "showPoints": "auto",
             "pointSize": 5
@@ -86,39 +86,13 @@
             "type": "grafana-azure-monitor-datasource",
             "uid": "azure-monitor-oob"
           }
-        },
-        {
-          "refId": "B",
-          "queryType": "Azure Monitor",
-          "azureMonitor": {
-            "resources": [
-              {
-                "resourceURI": "/subscriptions/7a5070f6-d59a-4d42-b6db-4840a50bf513/resourceGroups/rg-spoke-to-spoke-lab/providers/Microsoft.Network/virtualNetworkGateways/vpn-gw-hub",
-                "metricNamespace": "Microsoft.Network/virtualNetworkGateways"
-              }
-            ],
-            "metricName": "OutboundFlowsCount",
-            "aggregation": "Maximum",
-            "timeGrain": "PT5M",
-            "dimensionFilters": [],
-            "metricNamespace": "Microsoft.Network/virtualNetworkGateways",
-            "resourceGroup": "rg-spoke-to-spoke-lab",
-            "resourceName": "vpn-gw-hub",
-            "metricDefinition": "Microsoft.Network/virtualNetworkGateways",
-            "region": "centralus"
-          },
-          "subscription": "7a5070f6-d59a-4d42-b6db-4840a50bf513",
-          "datasource": {
-            "type": "grafana-azure-monitor-datasource",
-            "uid": "azure-monitor-oob"
-          }
         }
       ]
     },
     {
       "type": "timeseries",
-      "id": 1,
-      "title": "Gateway S2S Bandwidth (Bytes/sec)",
+      "id": 3,
+      "title": "Gateway Outbound Flows",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -136,9 +110,12 @@
           },
           "custom": {
             "lineWidth": 2,
-            "fillOpacity": 15
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "showPoints": "auto",
+            "pointSize": 5
           },
-          "unit": "Bps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -162,8 +139,8 @@
                 "metricNamespace": "Microsoft.Network/virtualNetworkGateways"
               }
             ],
-            "metricName": "AverageBandwidth",
-            "aggregation": "Average",
+            "metricName": "OutboundFlowsCount",
+            "aggregation": "Maximum",
             "timeGrain": "PT5M",
             "dimensionFilters": [],
             "metricNamespace": "Microsoft.Network/virtualNetworkGateways",
