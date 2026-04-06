@@ -16,6 +16,8 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
 
 ## The Problem: VPN Gateway Hairpin
 
+> **Note on gateway type**: This lab uses a VPN gateway (VpnGw1), but the same hairpin behavior occurs with an **ExpressRoute gateway**. Both gateway types support `allowGatewayTransit` / `useRemoteGateways` on VNet peerings, and both will process spoke-to-spoke traffic when a catch-all UDR forces `0.0.0.0/0 → VirtualNetworkGateway`. The fixes demonstrated here — direct peering and adjacent private endpoints — apply equally to ExpressRoute environments.
+
 ### Architecture (Broken State)
 
 ```
@@ -223,6 +225,10 @@ Gateway flows remained **essentially flat at 588–637** — the gateway is not 
 - Minimally invasive — only adds a PE subnet and two private endpoints in the consumer's VNet
 - Best when you can't change the existing network architecture (e.g., shared hub managed by a central team)
 - **Note**: Ancillary traffic (AAD auth, DNS, etc.) still transits the gateway due to the catch-all UDR — only storage data is bypassed
+
+### Other Approaches (Not Tested)
+
+**Azure Virtual WAN (VWAN)** would also address this issue. VWAN's hub provides native spoke-to-spoke routing without requiring manual peering or UDRs — the VWAN hub router automatically learns spoke prefixes and forwards traffic directly between spokes. In a VWAN topology, spoke-to-spoke traffic does not hairpin through the VPN or ExpressRoute gateway; it is routed through the VWAN hub router at no additional gateway cost. VWAN also supports routing intent and policies that provide more granular control over inter-spoke traffic flows. However, VWAN requires migrating from a traditional hub-and-spoke architecture and was not tested in this lab.
 
 ### Bicep Configurations
 
