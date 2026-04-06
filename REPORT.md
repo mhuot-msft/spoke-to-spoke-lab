@@ -6,7 +6,7 @@ This report validates the spoke-to-spoke traffic hairpinning problem through a V
 
 1. **Direct Peering** — Remove forced tunneling UDR, disable gateway transit, add spoke-to-spoke VNet peering ✅
 2. **Adjacent Private Endpoint** — Place private endpoints in the consumer's VNet so traffic stays local ✅
-3. **UDR Removal Only** — Remove the catch-all UDR without any other changes ❌ (breaks connectivity)
+3. **Specific UDR** — Replace the catch-all UDR with targeted spoke-to-spoke routes ⚠️ (works, but still hairpins)
 
 **Test environment**: Azure hub-and-spoke lab in `rg-spoke-to-spoke-lab` (centralus)  
 **Test workload**: 1 GB file upload/download cycles between `vm-dbrx` (Spoke 1) and ADLS Gen2 private endpoint (Spoke 2) using azcopy  
@@ -193,84 +193,75 @@ Default   Active   10.101.2.5/32     InterfaceEndpoint       ◄── Local Blo
 
 ---
 
-## Fix 3: UDR Removal Only (❌ Breaks Connectivity)
+## Fix 3: Specific UDR Routes (⚠️ Works, Still Hairpins)
 
 ### Concept
 
-The simplest possible fix: remove the forced tunneling UDR (`0.0.0.0/0 → VirtualNetworkGateway`) from both spoke route tables **without** any other changes. No peering modifications, no gateway transit changes, no additional infrastructure.
+Replace the catch-all UDR (`0.0.0.0/0 → VirtualNetworkGateway`) with **specific routes only for spoke-to-spoke traffic**. Each spoke gets a UDR targeting only the remote spoke's address prefix. Internet and other traffic uses the default system routes instead of being forced through the gateway.
 
-**Hypothesis**: Without the catch-all UDR, traffic would fall back to system routes and Azure's default routing would handle spoke-to-spoke traffic.
+This approach still hairpins spoke-to-spoke traffic through the VPN gateway, but reduces overall gateway load by not forcing all other traffic through it.
 
-**Result**: This approach **completely breaks** storage connectivity. Traffic to the ADLS private endpoint fails.
+**Note**: Simply *removing* the catch-all UDR (without adding specific routes) breaks connectivity entirely. Azure's RFC1918 blackhole routes (`10.0.0.0/8 → None`) drop traffic to the remote spoke's PE IP. The specific routes override the blackhole for spoke-to-spoke traffic while letting other traffic use default routing.
 
 ### Changes Applied
 
-| Change | Before (Broken) | After (UDR Removed) |
-|--------|-----------------|---------------------|
-| Route tables | `0.0.0.0/0 → VirtualNetworkGateway` | **Route removed** |
+| Change | Before (Broken) | After (Specific UDR) |
+|--------|-----------------|----------------------|
+| rt-dbrx routes | `0.0.0.0/0 → VirtualNetworkGateway` | `10.102.0.0/16 → VirtualNetworkGateway` |
+| rt-adls routes | `0.0.0.0/0 → VirtualNetworkGateway` | `10.101.0.0/16 → VirtualNetworkGateway` |
 | Hub↔Spoke peering | `allowGatewayTransit: true` | **Unchanged** |
 | Spoke→Hub peering | `useRemoteGateways: true` | **Unchanged** |
-| Spoke↔Spoke peering | None | **None** (unchanged) |
+| Default route | `0.0.0.0/0 → VirtualNetworkGateway` | `0.0.0.0/0 → Internet` (system default restored) |
 
-### Effective Routes (UDR Removed)
+### Architecture (Specific UDR)
+
+```
+  Spoke 1 (vm-dbrx)          Hub (vnet-hub)          Spoke 2 (ADLS PE)
+  10.101.0.0/16               10.100.0.0/16           10.102.0.0/16
+       │                           │                       │
+       │  UDR: 10.102.0.0/16      │    UDR: 10.101.0.0/16 │
+       │  → VirtualNetworkGateway  │    → VirtualNetworkGw │
+       │                           │                       │
+       └──── peering ─────► VPN Gateway ◄──── peering ─────┘
+              (useRemoteGw=true)    │    (allowGwTransit=true)
+                                    │
+                            ONLY spoke-to-spoke
+                            traffic hairpins here
+                            (other traffic uses Internet)
+```
+
+### Effective Routes (Specific UDR)
 
 ```
 Source    State    Address Prefix    Next Hop Type
 ────────  ───────  ────────────────  ─────────────────────────
 Default   Active   10.101.0.0/16     VnetLocal
 Default   Active   10.100.0.0/16     VNetPeering
-Default   Active   0.0.0.0/0         Internet                ◄── Default restored
+User      Active   10.102.0.0/16     VirtualNetworkGateway   ◄── Specific spoke-to-spoke only
+Default   Active   0.0.0.0/0         Internet                ◄── Default restored (not forced through GW)
 User      Active   68.47.19.27/32    Internet
-Default   Active   10.0.0.0/8        None                    ◄── BLACKHOLE for all RFC1918
-Default   Active   172.16.0.0/12     None                    ◄── BLACKHOLE
-Default   Active   192.168.0.0/16    None                    ◄── BLACKHOLE
+Default   Active   10.0.0.0/8        None                    ◄── Blackhole (overridden by /16 for spoke-adls)
 ```
 
-### Why It Fails
+**Key observation**: The specific route `10.102.0.0/16 → VirtualNetworkGateway` is more specific than the `10.0.0.0/8 → None` blackhole, so spoke-to-spoke traffic reaches the gateway. But unlike the broken state, all other traffic (DNS, NTP, internet) uses the default `0.0.0.0/0 → Internet` route instead of being forced through the gateway.
 
-The critical insight is Azure's **RFC1918 blackhole routes**. When the UDR is removed, the system default route table includes:
-
-- `10.0.0.0/8 → None` — drops all traffic to 10.x.x.x addresses
-- `172.16.0.0/12 → None` — drops all traffic to 172.16.x.x addresses
-- `192.168.0.0/16 → None` — drops all traffic to 192.168.x.x addresses
-
-The ADLS private endpoint IP (`10.102.2.4`) falls under `10.0.0.0/8 → None` and is **blackholed**. Even though `useRemoteGateways: true` is still set, the VPN gateway does not inject routes for other peered spoke VNets — it only injects routes learned via BGP from S2S/P2S connections.
-
-```
-DNS:     saadlslabmh01.dfs.core.windows.net → 10.102.2.4 (via private DNS zone)
-Routing: 10.102.2.4 matches 10.0.0.0/8 → None (DROPPED)
-Result:  azcopy hangs indefinitely waiting for TCP connection
-```
-
-### Traffic Test Results
-
-The 15-minute azcopy test **failed to complete a single pass**. The upload hung indefinitely on the first 1 GB file:
-
-```
-[2026-04-06T00:45:59+00:00] Pass 1 upload...
-(hung for 15+ minutes — no progress, no error, no timeout)
-```
-
-### Grafana Metrics — UDR Removed (00:35–01:00 UTC)
+### Grafana Metrics — Specific UDR (02:01–02:16 UTC)
 
 | Metric | Observation |
 |--------|-------------|
-| Gateway Inbound/Outbound Flows | **~585-595** — baseline management probes only, no data traffic |
-| VM Network Out | **~0** — no upload traffic (azcopy connection blackholed) |
-| VM Network In | **~0** — no download traffic |
-| Storage Ingress/Egress | **0 B** — flat zero, no data reached storage account |
+| Gateway Inbound/Outbound Flows | **~1,500** — elevated but **50% less than broken state** (~3,000) |
+| VM Network Out | ~5 MB — active upload traffic |
+| VM Network In | ~5 MB — active download traffic |
+| Storage Ingress/Egress | Flat — Azure Monitor lag (traffic confirmed by VM metrics and azcopy completion) |
 
-![UDR Removed — All metrics at baseline, no storage traffic](dashboards/udr-top.png)
-![UDR Removed — Storage metrics confirm zero traffic](dashboards/udr-bottom.png)
+![Specific UDR — Gateway flows at ~1,500, VM traffic active](dashboards/udr-top.png)
+![Specific UDR — Storage metrics (Azure Monitor lag)](dashboards/udr-bottom.png)
 
-### Lesson Learned
+### Analysis
 
-Simply removing the forced tunneling UDR is **not sufficient** to fix spoke-to-spoke traffic. Without the catch-all route, traffic to the remote spoke's address space (`10.102.0.0/16`) is blackholed by Azure's default RFC1918 blackhole routes (`10.0.0.0/8 → None`).
+The specific UDR approach **works** but does not eliminate the gateway from the spoke-to-spoke data path. Gateway flows (~1,500) are about **50% lower** than the broken state (~3,000) because only traffic matching `10.102.0.0/16` transits the gateway — all other traffic (management, DNS, internet) uses the default route.
 
-To successfully fix spoke-to-spoke traffic, you need one of:
-- **Direct peering** between spokes (Fix 1) — provides a `VNetPeering` route to override the blackhole
-- **Adjacent private endpoints** (Fix 2) — provides `/32 InterfaceEndpoint` routes within the local VNet
-- An **NVA or Azure Firewall** in the hub (not tested) — would require UDRs pointing to the NVA IP
+This is an improvement over the broken catch-all UDR but still less optimal than Fix 1 (direct peering, ~700 flows) or Fix 2 (adjacent PE, ~630 flows), which remove the gateway from the data path entirely.
 
 ---
 
@@ -278,13 +269,13 @@ To successfully fix spoke-to-spoke traffic, you need one of:
 
 ### Comparison of All Configurations
 
-| Metric | Broken (Hairpin) | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) | Fix 3 (UDR Removal) |
-|--------|-----------------|----------------------|---------------------|---------------------|
-| **Status** | ⚠️ Working (inefficient) | ✅ Working | ✅ Working | ❌ **Broken** |
-| Gateway Flows | **~3,000** | ~700 (↓77%) | **~630** (↓79%) | ~590 (baseline) |
-| Storage Traffic | Active | Active | Active | **0 B (blackholed)** |
-| VM Throughput | ~18 GB | ~18 GB | **~20 GB** | **0 GB (failed)** |
-| Routing changes | — | UDR removed, gateway transit disabled | **None** | UDR removed only |
+| Metric | Broken (Hairpin) | Fix 1 (Direct Peering) | Fix 2 (Adjacent PE) | Fix 3 (Specific UDR) |
+|--------|-----------------|----------------------|---------------------|----------------------|
+| **Status** | ⚠️ Working (inefficient) | ✅ Working | ✅ Working | ⚠️ Working (still hairpins) |
+| Gateway Flows | **~3,000** | ~700 (↓77%) | **~630** (↓79%) | ~1,500 (↓50%) |
+| Gateway in data path? | Yes (all traffic) | **No** | **No** | Yes (spoke-to-spoke only) |
+| VM Throughput | ~18 GB | ~18 GB | **~20 GB** | ~18 GB |
+| Routing changes | — | UDR removed, gateway transit disabled | **None** | Catch-all → specific routes |
 | Peering changes | — | Spoke-to-spoke peering added | **None** | **None** |
 | Infrastructure added | — | None | PE subnet + 2 PEs | None |
 
@@ -299,10 +290,12 @@ To successfully fix spoke-to-spoke traffic, you need one of:
 - Minimally invasive — only adds a PE subnet and two private endpoints in the consumer's VNet
 - Best when you can't change the existing network architecture (e.g., shared hub managed by a central team)
 
-### Fix 3: UDR Removal Only (Not Viable)
-- Removing the catch-all UDR alone **breaks** storage connectivity
-- Azure's RFC1918 blackhole routes (`10.0.0.0/8 → None`) prevent traffic from reaching the remote spoke
-- Demonstrates that forced tunneling was the only thing making spoke-to-spoke work — without it, you need an alternative path (direct peering, local PEs, or an NVA)
+### Fix 3: Specific UDR Routes
+- Replaces the catch-all `0.0.0.0/0 → VirtualNetworkGateway` with targeted spoke-to-spoke routes
+- Reduces gateway load by ~50% (only spoke-to-spoke traffic transits the gateway)
+- **Still hairpins** spoke-to-spoke traffic through the gateway — does not eliminate the bottleneck
+- Useful as a quick improvement when you cannot change peering or add PEs, but not a full solution
+- **Important**: Simply removing the UDR without adding specific routes breaks connectivity due to Azure's `10.0.0.0/8 → None` blackhole
 
 ### Bicep Configurations
 
@@ -311,7 +304,7 @@ All four states are codified as self-contained Bicep deployments:
 - **`bicep/lab-current/`** — Reproduces the broken hairpin state
 - **`bicep/lab-fixed-direct-peering/`** — Fix 1: Direct spoke-to-spoke peering
 - **`bicep/lab-fixed-adjacent-pe/`** — Fix 2: Adjacent private endpoints in consumer VNet
-- **`bicep/lab-fixed-udr/`** — Fix 3: UDR removal only (demonstrates failure)
+- **`bicep/lab-fixed-udr/`** — Fix 3: Specific UDR routes for spoke-to-spoke traffic
 
 Deploy any configuration with:
 ```bash
