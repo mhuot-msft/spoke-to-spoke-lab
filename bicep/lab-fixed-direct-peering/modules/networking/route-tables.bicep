@@ -33,5 +33,15 @@ resource rtAdls 'Microsoft.Network/routeTables@2023-11-01' = {
   }
 }
 
+resource rtPe 'Microsoft.Network/routeTables@2023-11-01' = {
+  name: 'rt-pe'
+  location: location
+  tags: tags
+  properties: {
+    routes: []
+  }
+}
+
 output rtDbrxId string = rtDbrx.id
 output rtAdlsId string = rtAdls.id
+output rtPeId string = rtPe.id

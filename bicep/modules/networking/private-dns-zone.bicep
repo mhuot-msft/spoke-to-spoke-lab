@@ -1,52 +1,102 @@
-param tags object
 param hubVnetId string
 param spokeDbrxVnetId string
 param spokeAdlsVnetId string
+param spokePeVnetId string
+param tags object = {}
 
-resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+// ── DFS Private DNS Zone ──
+resource dfsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: 'privatelink.dfs.${environment().suffixes.storage}'
   location: 'global'
   tags: tags
 }
 
-resource linkHub 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: privateDnsZone
-  name: 'link-vnet-hub'
+resource dfsLinkHub 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dfsZone
+  name: 'link-hub'
   location: 'global'
-  tags: tags
   properties: {
-    virtualNetwork: {
-      id: hubVnetId
-    }
+    virtualNetwork: { id: hubVnetId }
     registrationEnabled: false
   }
 }
 
-resource linkDbrx 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: privateDnsZone
-  name: 'link-vnet-spoke-dbrx'
+resource dfsLinkDbrx 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dfsZone
+  name: 'link-spoke-dbrx'
   location: 'global'
-  tags: tags
   properties: {
-    virtualNetwork: {
-      id: spokeDbrxVnetId
-    }
+    virtualNetwork: { id: spokeDbrxVnetId }
     registrationEnabled: false
   }
 }
 
-resource linkAdls 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: privateDnsZone
-  name: 'link-vnet-spoke-adls'
+resource dfsLinkAdls 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dfsZone
+  name: 'link-spoke-adls'
   location: 'global'
-  tags: tags
   properties: {
-    virtualNetwork: {
-      id: spokeAdlsVnetId
-    }
+    virtualNetwork: { id: spokeAdlsVnetId }
     registrationEnabled: false
   }
 }
 
-output dnsZoneId string = privateDnsZone.id
-output dnsZoneName string = privateDnsZone.name
+resource dfsLinkPe 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dfsZone
+  name: 'link-spoke-pe'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: spokePeVnetId }
+    registrationEnabled: false
+  }
+}
+
+// ── Blob Private DNS Zone ──
+resource blobZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.blob.${environment().suffixes.storage}'
+  location: 'global'
+  tags: tags
+}
+
+resource blobLinkHub 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: blobZone
+  name: 'link-hub'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: hubVnetId }
+    registrationEnabled: false
+  }
+}
+
+resource blobLinkDbrx 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: blobZone
+  name: 'link-spoke-dbrx'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: spokeDbrxVnetId }
+    registrationEnabled: false
+  }
+}
+
+resource blobLinkAdls 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: blobZone
+  name: 'link-spoke-adls'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: spokeAdlsVnetId }
+    registrationEnabled: false
+  }
+}
+
+resource blobLinkPe 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: blobZone
+  name: 'link-spoke-pe'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: spokePeVnetId }
+    registrationEnabled: false
+  }
+}
+
+output dfsZoneId string = dfsZone.id
+output blobZoneId string = blobZone.id

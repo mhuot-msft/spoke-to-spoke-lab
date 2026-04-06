@@ -2,6 +2,7 @@ param tags object
 param hubVnetId string
 param spokeDbrxVnetId string
 param spokeAdlsVnetId string
+param spokePeVnetId string
 
 // --- DFS Private DNS Zone ---
 
@@ -50,6 +51,19 @@ resource dfsLinkAdls 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020
   }
 }
 
+resource dfsLinkPe 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dnsZoneDfs
+  name: 'link-dfs-vnet-spoke-pe'
+  location: 'global'
+  tags: tags
+  properties: {
+    virtualNetwork: {
+      id: spokePeVnetId
+    }
+    registrationEnabled: false
+  }
+}
+
 // --- Blob Private DNS Zone ---
 
 resource dnsZoneBlob 'Microsoft.Network/privateDnsZones@2020-06-01' = {
@@ -92,6 +106,19 @@ resource blobLinkAdls 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@202
   properties: {
     virtualNetwork: {
       id: spokeAdlsVnetId
+    }
+    registrationEnabled: false
+  }
+}
+
+resource blobLinkPe 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: dnsZoneBlob
+  name: 'link-blob-vnet-spoke-pe'
+  location: 'global'
+  tags: tags
+  properties: {
+    virtualNetwork: {
+      id: spokePeVnetId
     }
     registrationEnabled: false
   }

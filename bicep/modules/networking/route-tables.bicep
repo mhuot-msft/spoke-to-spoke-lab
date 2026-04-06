@@ -1,34 +1,33 @@
 param location string
-param tags object
 param allowedSshSourceIp string = ''
+param tags object = {}
+
+var defaultRoute = [
+  {
+    name: 'default-to-gateway'
+    properties: {
+      addressPrefix: '0.0.0.0/0'
+      nextHopType: 'VirtualNetworkGateway'
+    }
+  }
+]
+
+var sshReturnRoute = allowedSshSourceIp != '' ? [
+  {
+    name: 'ssh-return'
+    properties: {
+      addressPrefix: '${allowedSshSourceIp}/32'
+      nextHopType: 'Internet'
+    }
+  }
+] : []
 
 resource rtDbrx 'Microsoft.Network/routeTables@2023-11-01' = {
   name: 'rt-dbrx'
   location: location
   tags: tags
   properties: {
-    routes: concat(
-      [
-        {
-          name: 'default-to-gateway'
-          properties: {
-            addressPrefix: '0.0.0.0/0'
-            nextHopType: 'VirtualNetworkGateway'
-          }
-        }
-      ],
-      !empty(allowedSshSourceIp)
-        ? [
-            {
-              name: 'ssh-return'
-              properties: {
-                addressPrefix: '${allowedSshSourceIp}/32'
-                nextHopType: 'Internet'
-              }
-            }
-          ]
-        : []
-    )
+    routes: concat(defaultRoute, sshReturnRoute)
   }
 }
 
@@ -37,17 +36,19 @@ resource rtAdls 'Microsoft.Network/routeTables@2023-11-01' = {
   location: location
   tags: tags
   properties: {
-    routes: [
-      {
-        name: 'default-to-gateway'
-        properties: {
-          addressPrefix: '0.0.0.0/0'
-          nextHopType: 'VirtualNetworkGateway'
-        }
-      }
-    ]
+    routes: defaultRoute
+  }
+}
+
+resource rtPe 'Microsoft.Network/routeTables@2023-11-01' = {
+  name: 'rt-pe'
+  location: location
+  tags: tags
+  properties: {
+    routes: defaultRoute
   }
 }
 
 output rtDbrxId string = rtDbrx.id
 output rtAdlsId string = rtAdls.id
+output rtPeId string = rtPe.id

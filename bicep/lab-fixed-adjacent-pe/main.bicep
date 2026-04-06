@@ -56,6 +56,15 @@ module spokeAdlsVnet 'modules/networking/spoke-adls-vnet.bicep' = {
   }
 }
 
+module spokePeVnet 'modules/networking/spoke-pe-vnet.bicep' = {
+  name: 'spokePeVnet'
+  params: {
+    location: location
+    routeTableId: routeTables.outputs.rtPeId
+    tags: tags
+  }
+}
+
 // ── Phase 2: VPN Gateway ──────────────────────────────────────────────────────
 
 module vpnGateway 'modules/networking/vpn-gateway.bicep' = {
@@ -95,6 +104,19 @@ module peeringHubAdls 'modules/networking/peering.bicep' = {
   ]
 }
 
+module peeringHubPe 'modules/networking/peering.bicep' = {
+  name: 'peeringHubPe'
+  params: {
+    localVnetName: hubVnet.outputs.vnetName
+    remoteVnetName: spokePeVnet.outputs.vnetName
+    allowGatewayTransit: true
+    useRemoteGateways: true
+  }
+  dependsOn: [
+    vpnGateway
+  ]
+}
+
 // ── Phase 4: DNS, Storage & Compute ──────────────────────────────────────────
 
 module privateDnsZones 'modules/networking/private-dns-zones.bicep' = {
@@ -103,6 +125,7 @@ module privateDnsZones 'modules/networking/private-dns-zones.bicep' = {
     hubVnetId: hubVnet.outputs.vnetId
     spokeDbrxVnetId: spokeDbrxVnet.outputs.vnetId
     spokeAdlsVnetId: spokeAdlsVnet.outputs.vnetId
+    spokePeVnetId: spokePeVnet.outputs.vnetId
     tags: tags
   }
 }
@@ -112,7 +135,7 @@ module adlsAccount 'modules/storage/adls-account.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
-    subnetId: spokeAdlsVnet.outputs.peSubnetId
+    subnetId: spokePeVnet.outputs.peSubnetId
     dfsZoneId: privateDnsZones.outputs.dfsZoneId
     blobZoneId: privateDnsZones.outputs.blobZoneId
     tags: tags

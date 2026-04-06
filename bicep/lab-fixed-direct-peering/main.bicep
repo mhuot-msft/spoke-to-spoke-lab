@@ -54,6 +54,15 @@ module spokeAdlsVnet 'modules/networking/spoke-adls-vnet.bicep' = {
   }
 }
 
+module spokePeVnet 'modules/networking/spoke-pe-vnet.bicep' = {
+  name: 'spoke-pe-vnet'
+  params: {
+    location: location
+    tags: tags
+    routeTableId: routeTables.outputs.rtPeId
+  }
+}
+
 // --- Phase 2: VPN Gateway (still deployed, but NOT in spoke-to-spoke data path) ---
 
 module vpnGateway 'modules/networking/vpn-gateway.bicep' = {
@@ -93,14 +102,27 @@ module peeringHubAdls 'modules/networking/peering.bicep' = {
   }
 }
 
-// FIXED: Direct spoke-to-spoke peering (DBRX ↔ ADLS)
-module peeringDbrxAdls 'modules/networking/peering.bicep' = {
-  name: 'peering-dbrx-adls'
+// Hub ↔ Spoke PE — gateway transit disabled
+module peeringHubPe 'modules/networking/peering.bicep' = {
+  name: 'peering-hub-pe'
+  params: {
+    hubVnetName: hubVnet.outputs.vnetName
+    hubVnetId: hubVnet.outputs.vnetId
+    spokeVnetName: spokePeVnet.outputs.vnetName
+    spokeVnetId: spokePeVnet.outputs.vnetId
+    allowGatewayTransit: false
+    useRemoteGateways: false
+  }
+}
+
+// FIXED: Direct spoke-to-spoke peering (DBRX ↔ PE VNet)
+module peeringDbrxPe 'modules/networking/peering.bicep' = {
+  name: 'peering-dbrx-pe'
   params: {
     hubVnetName: spokeDbrxVnet.outputs.vnetName
     hubVnetId: spokeDbrxVnet.outputs.vnetId
-    spokeVnetName: spokeAdlsVnet.outputs.vnetName
-    spokeVnetId: spokeAdlsVnet.outputs.vnetId
+    spokeVnetName: spokePeVnet.outputs.vnetName
+    spokeVnetId: spokePeVnet.outputs.vnetId
     allowGatewayTransit: false
     useRemoteGateways: false
   }
@@ -115,6 +137,7 @@ module privateDnsZones 'modules/networking/private-dns-zones.bicep' = {
     hubVnetId: hubVnet.outputs.vnetId
     spokeDbrxVnetId: spokeDbrxVnet.outputs.vnetId
     spokeAdlsVnetId: spokeAdlsVnet.outputs.vnetId
+    spokePeVnetId: spokePeVnet.outputs.vnetId
   }
 }
 
@@ -124,7 +147,7 @@ module adlsAccount 'modules/storage/adls-account.bicep' = {
     location: location
     tags: tags
     storageAccountSuffix: storageAccountSuffix
-    subnetPeId: spokeAdlsVnet.outputs.subnetPeId
+    subnetPeId: spokePeVnet.outputs.peSubnetId
     dfsZoneId: privateDnsZones.outputs.dfsZoneId
     blobZoneId: privateDnsZones.outputs.blobZoneId
   }

@@ -20,12 +20,6 @@ resource spokeAdlsVnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
           routeTable: routeTableId != '' ? { id: routeTableId } : null
         }
       }
-      {
-        name: 'subnet-pe'
-        properties: {
-          addressPrefix: '10.102.2.0/24'
-        }
-      }
     ]
   }
 }
@@ -33,4 +27,3 @@ resource spokeAdlsVnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
 output vnetId string = spokeAdlsVnet.id
 output vnetName string = spokeAdlsVnet.name
 output subnetId string = spokeAdlsVnet.properties.subnets[0].id
-output peSubnetId string = spokeAdlsVnet.properties.subnets[1].id
